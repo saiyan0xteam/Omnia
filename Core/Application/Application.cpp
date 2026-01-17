@@ -104,10 +104,12 @@ void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum se
 namespace Omnia
 {
 	static const constexpr bool ShouldInitializeImgui = true;
-	constexpr float default_player_speed = 0.05f;
-	constexpr float default_player_sensitivity = 0.25f;
+	const float default_player_speed = 0.05f;
+	const float default_player_sensitivity = 0.25f;
+	const float default_fov = 110.0f;
 	float ex_PlayerSpeed = default_player_speed;
 	float ex_PlayerSensitivity = default_player_sensitivity;
+	float ex_FOV = default_fov;
 
 	Application OmniaApplication;
 
@@ -161,16 +163,10 @@ namespace Omnia
 
 		glfwMakeContextCurrent(m_Window);
 
-		// Turn on V-Sync
 		glfwSwapInterval(1);
 
 		glewInit();
 
-#ifndef NDEBUG
-		glEnable(GL_DEBUG_OUTPUT);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-		glDebugMessageCallback(gl_debug_callback, nullptr);
-#endif
 		char* renderer = (char*)glGetString(GL_RENDERER);
 		char* vendor = (char*)glGetString(GL_VENDOR);
 		char* version = (char*)glGetString(GL_VERSION);
@@ -252,7 +248,7 @@ namespace Omnia
 		}
 
 		m_World->p_Player->p_Position = glm::vec3(0, spawn_y, 0); 
-		m_World->p_Player->p_Camera.SetPosition(glm::vec3(0, spawn_y, 0));
+		m_World->p_Player->p_Camera.SetPosition(glm::vec3(0, spawn_y, 0) + glm::vec3(0.0f, Player::EyeOffsetY, 0.0f));
 
 		m_Renderer2D = new Renderer2D;
 
@@ -281,6 +277,11 @@ namespace Omnia
 
 	void Application::OnUpdate()
 	{
+		// Calculate delta time
+		float currentFrameTime = (float)glfwGetTime();
+		m_DeltaTime = currentFrameTime - m_LastFrameTime;
+		m_LastFrameTime = currentFrameTime;
+
 		if (ShouldInitializeImgui)
 		{
 			ImGui_ImplOpenGL3_NewFrame();
@@ -307,23 +308,29 @@ namespace Omnia
 		{
 			// Render the world in ALL states
 			// Only show crosshair if playing or paused (optional)
-			bool show_cross = (m_GameState == GameState::PlayingState); 
+			bool show_cross = (m_GameState == GameState::PlayingState && !m_InventoryOpen); 
 			m_World->RenderWorld(show_cross);
 
-			bool update_player_input = (m_GameState == GameState::PlayingState);
+			// Determine if we should update player and use deltaTime
+			bool should_update_player = (m_GameState == GameState::PlayingState && !m_InventoryOpen);
+			bool is_paused = (m_GameState == GameState::PauseState);
+			float effective_deltaTime = (m_InventoryOpen || is_paused) ? 0.0f : m_DeltaTime;
 			
 			// Always update world (generates chunks, lights, etc.)
-			// but only process player input if playing
+			// but only process player input if playing and inventory is not open
 			if (m_GameState == GameState::PlayingState) 
-				glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			{
+				if (!m_InventoryOpen)
+					glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			}
 				
-			m_World->OnUpdate(m_Window, update_player_input);
+			m_World->OnUpdate(m_Window, effective_deltaTime, should_update_player);
 
 			if (m_GameState != GameState::PlayingState)
 			{
-				// Rotate camera slowly in menu / pause / other states
+				// Rotate camera slowly in menu / pause / other states (frame-independent)
 				float currentYaw = m_World->p_Player->p_Camera.GetYaw();
-				m_World->p_Player->p_Camera.SetYaw(currentYaw + 10.0f * 0.016f);
+				m_World->p_Player->p_Camera.SetYaw(currentYaw + 10.0f * m_DeltaTime);
 				m_World->p_Player->p_Camera.Refresh(); 
 			}
 		}
@@ -353,158 +360,82 @@ namespace Omnia
 	void Application::OnImGuiRender()
 	{
 		ImGuiStyle& style = ImGui::GetStyle();
-
 		static int renderdistance = 6;
-
 		static bool first_run = true;
 		int w, h;
 		glfwGetFramebufferSize(m_Window, &w, &h);
-
-		// For the world create menu
 		static char input[64];
 		static int seed = 0;
 		static int world_type = 0;
-
+		static bool show_invalid_name_error = false;
+		static double error_display_time = 0.0;
 		std::vector<std::string> Saves;
-
 		if (m_GameState == GameState::PlayingState && m_World)
 		{
 			bool open = true;
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBackground;
 			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
-
-			//if (ImGui::Begin("Debug Text", &open, window_flags))
-			//{
-			//	stringstream ss;
-			//	BlockType current_block = static_cast<BlockType>(m_World->p_Player->p_CurrentHeldBlock);
-			//	const glm::vec3& pos = m_World->p_Player->p_Position;
-
-			//	ss << "VSync : " << m_VSync << "\n";
-			//	ss << "Current held block : " << BlockDatabase::GetBlockName(current_block).c_str() << "\n";
-			//	ss << "Player Position =  X : " << pos.x << " | Y : " << pos.y << " | Z : " << pos.z << "\n"; 
-			//	ss << "Player is colliding : " << m_World->p_Player->p_IsColliding << "\n";
-			//	ss << "Freefly : " << m_World->p_Player->p_FreeFly << "\n";
-			//	ss << "Chunk amount : " << m_World->m_ChunkCount << "\n";
-			//	ss << "Chunks being rendered : " << m_World->p_ChunksRendered << "\n";
-			//	ss << "Sun Position : " << m_World->GetSunPositionY() << "\n";  
-			//	ImGui::Text(ss.str().c_str());
-			//	
-			//	if (m_ShowDebugInfo)
-			//	{
-			//		std::stringstream debug_ss;
-
-			//		debug_ss << "This menu is experimental! It is still W.I.P as it is extremely platform specific\n";
-			//		debug_ss << "Total CPU Used : " << m_ProcDebugInfo.cpu_usage << "\n";
-			//		debug_ss << "Total Memory : " << m_ProcDebugInfo.total_mem << "  /  " << m_ProcDebugInfo.total_mem_used << "\n";
-			//		debug_ss << "Total Virtual Memory : " << m_ProcDebugInfo.total_vm << "  /  " << m_ProcDebugInfo.total_vm_used << "\n";
-			//		debug_ss << "CPU Usage : " << m_ProcDebugInfo.cpu_usage << "\n";
-			//		ImGui::Text(debug_ss.str().c_str());
-			//	}
-
-			//	ImGui::End();
-			//}
-
-
-
-
-			if (ImGui::Begin("##Omnia-InGame", &open, window_flags)) {
-
-
-
-				// -- Player Stats (Above Hotbar) --
-				// Aligning bars to be above the hotbar
+			if (ImGui::Begin("##Omnia-InGame", &open, window_flags))
+			{
 				float stats_width = 200.0f;
 				float stats_start_x = 15.0f;
 				float stats_start_y = h - 200.0f; 
-				
 				ImGui::SetCursorPos(ImVec2(stats_start_x, stats_start_y));
-				
-				// Helper to draw a styled progress bar
 				auto DrawImGuiBar = [&](float val, float max_val, const char* label, ImVec4 color) {
 					ImGui::PushStyleColor(ImGuiCol_PlotHistogram, color);
 					ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.5f));
-					
 					char overlay[32];
 					sprintf(overlay, "%s %.0f/%.0f", label, val, max_val);
-					
 					ImGui::ProgressBar(val / max_val, ImVec2(stats_width, 18), overlay);
-					
 					ImGui::PopStyleColor(2);
-					// Add a small spacing
 					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
-					ImGui::SetCursorPosX(stats_start_x); 
+					ImGui::SetCursorPosX(stats_start_x);
 				};
-
 				DrawImGuiBar(m_World->p_Player->p_Health, 100.0f, "Health", ImVec4(0.9f, 0.3f, 0.23f, 1.0f)); // Red
 				DrawImGuiBar(m_World->p_Player->p_Armor, 100.0f, "Armor", ImVec4(0.7f, 0.75f, 0.78f, 1.0f));  // Silver
 				DrawImGuiBar(m_World->p_Player->p_Hunger, 100.0f, "Hunger", ImVec4(0.95f, 0.61f, 0.07f, 1.0f)); // Orange
 				DrawImGuiBar(m_World->p_Player->p_Temperature, 100.0f, "Air", ImVec4(0.2f, 0.6f, 0.86f, 1.0f));   // Blue
-
-
-				// -- Hotbar --
-				static BlockType hotbar_blocks[] = {
-
-					BlockType::Grass, BlockType::Dirt, BlockType::Stone, BlockType::Cobblestone,
-					BlockType::OakLog, BlockType::OakPlanks, BlockType::Sand, BlockType::Cactus,
-					BlockType::GlassWhite
-				};
-
-				float hotbar_width = 9 * 50.0f + 10 * 5.0f;
-				float start_x = 15.0f;
-				float start_y = h - 60.0f;
-
-				ImGui::SetCursorPos(ImVec2(start_x, start_y));
 				
-				ImTextureID atlas_tex = (ImTextureID)(intptr_t)m_World->GetRenderer()->GetAtlasTexture()->GetTextureID();
-				float atlas_w = (float)m_World->GetRenderer()->GetAtlasTexture()->GetWidth();
-				float atlas_h = (float)m_World->GetRenderer()->GetAtlasTexture()->GetHeight();
-
-				for (int i = 0; i < 9; i++) {
-					BlockType block = hotbar_blocks[i];
-					bool is_selected = (m_World->p_Player->p_CurrentHeldBlock == (uint8_t)block);
-					
-					ImGui::PushID(i);
-					
-					// Slot Background
-					ImVec2 p = ImGui::GetCursorScreenPos();
-					ImGui::GetBackgroundDrawList()->AddRectFilled(p, ImVec2(p.x + 50, p.y + 50), IM_COL32(50, 50, 50, 200), 5.0f);
-					if (is_selected) {
-						ImGui::GetBackgroundDrawList()->AddRect(p, ImVec2(p.x + 50, p.y + 50), IM_COL32(255, 255, 255, 255), 5.0f, 0, 3.0f);
-					}
-
-
-
-					// 2D Block Icon Rendering (Reverted from 3D due to aspect ratio issues)
-					const std::array<uint16_t, 8>& uv_raw = BlockDatabase::GetBlockTexture(block, BlockFaceType::front);
-					
-					// Correcting UVs for vertical flip: y1 -> y2, y2 -> y1
-					float x1 = uv_raw[2] / atlas_w;
-					float y1 = uv_raw[3] / atlas_h;
-					float x2 = uv_raw[0] / atlas_w;
-					float y2 = uv_raw[5] / atlas_h;
-					
-					ImVec2 uv0 = ImVec2(x1, y2);
-					ImVec2 uv1 = ImVec2(x2, y1);
-
-					ImGui::SetCursorScreenPos(ImVec2(p.x + 5, p.y + 5));
-					ImGui::Image(atlas_tex, ImVec2(40, 40), uv0, uv1);
-
-					ImGui::PopID();
-					ImGui::SetCursorScreenPos(ImVec2(p.x + 55, p.y));
+				// Hotbar rendering - dinamik pozisyon
+				if (!m_InventoryOpen)
+				{
+					// Normal pozisyon (sol alt)
+					float hotbar_width = 9 * 50.0f + 10 * 5.0f;
+					float start_x = 15.0f;
+					float start_y = h - 60.0f;
+					RenderHotbar(start_x, start_y, hotbar_width);
 				}
-
+				if (m_ShowDebugInfo) {
+					ImGui::PushFont(Fonts::Exo2::bold);
+					ImGui::SetCursorPos(ImVec2(15, 15));
+					stringstream ss;
+					BlockType current_block = static_cast<BlockType>(m_World->p_Player->p_CurrentHeldBlock);
+					const glm::vec3& pos = m_World->p_Player->p_Position;
+					ss << "VSync: " << m_VSync << "\n";
+					ss << "Current Held Block: " << BlockDatabase::GetBlockName(current_block).c_str() << "\n";
+					ss << "Player Position X: " << pos.x << " | Y: " << pos.y << " | Z: " << pos.z << "\n";
+					ss << "Collision: " << m_World->p_Player->p_IsColliding << "\n";
+					ss << "Freefly (Noclip): " << m_World->p_Player->p_FreeFly << "\n";
+					ss << "Chunk Amount: " << m_World->m_ChunkCount << "\n";
+					ss << "Loaded Chunks: " << m_World->p_ChunksRendered << "\n";
+					ss << "Sun Position: " << m_World->GetSunPositionY() << "\n";
+					ss << "Total CPU Used: " << m_ProcDebugInfo.cpu_usage << "\n";
+					ss << "Total Memory: " << m_ProcDebugInfo.total_mem << "  /  " << m_ProcDebugInfo.total_mem_used << "\n";
+					ss << "Total Virtual Memory: " << m_ProcDebugInfo.total_vm << "  /  " << m_ProcDebugInfo.total_vm_used << "\n";
+					ss << "CPU Usage: " << m_ProcDebugInfo.cpu_usage << "\n";
+					ImGui::Text(ss.str().c_str());
+					ImGui::PopFont();
+				}
 				ImGui::End();
 			}
 		}
-
 		if (first_run)
 		{
 			memset(&input, '\0', 64);
 			omnialogo = LoadTextureFromMemory_GL(omnia_logo, sizeof(omnia_logo), &logoWidth, &logoHeight);
 			first_run = false;
 		}
-		
 		if (m_GameState == GameState::MenuState)
 		{
 			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -550,86 +481,80 @@ namespace Omnia
 		if (m_GameState != GameState::SettingsState) prev_settings_state = m_GameState;
 		if (m_GameState == GameState::SettingsState)
 		{
-			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			// m_Renderer2D->RenderQuad(glm::vec2(0, 0), &m_BlurMenuBackground, &m_OrthagonalCamera, w, h);
+			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);;
 			bool open = true;
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
 			ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);
 			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
-			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.7f);
+			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.4f);
 			style.WindowBorderSize = 0.0f;
 			style.WindowPadding = ImVec2(0, 0);
 			if (ImGui::Begin("##Omnia-Settings", &open, window_flags))
 			{
+				ImGui::PushFont(Fonts::Custom::customFont_MainDesc);
+				ImGui::SetCursorPos(ImVec2(450, 440));
+				ImGui::SetNextItemWidth(950.0f);
 				ImGui::SliderFloat("Player Speed", &ex_PlayerSpeed, 0.01, 0.18f);
+				ImGui::SetCursorPos(ImVec2(450, 480));
+				ImGui::SetNextItemWidth(950.0f);
 				ImGui::SliderFloat("Sensitivity", &ex_PlayerSensitivity, 0.01, 1.5f);
+				ImGui::SetCursorPos(ImVec2(450, 520));
+				ImGui::SetNextItemWidth(950.0f);
 				ImGui::SliderInt("Render Distance", &renderdistance, 2, 16);
-
-				ImGui::NewLine();
-				ImGui::NewLine();
-
-				if (ImGui::Button("Ok"))
+				ImGui::SetCursorPos(ImVec2(450, 560));
+				ImGui::SetNextItemWidth(950.0f);
+				ImGui::SliderFloat("Field of View", &ex_FOV, 60.0f, 110.0f);
+				ImGui::SetCursorPos(ImVec2(450, 600));
+				if (ImGui::Button("Apply"))
 				{
 					m_GameState = prev_settings_state;
+					m_World->SetRenderDistance(renderdistance);
+					// Only apply FOV to actual game worlds, not menu world
+					if (m_World && m_World->p_Player && m_World->GetName() != "MenuWorld")
+					{
+						m_World->p_Player->p_Camera.SetFov(ex_FOV);
+					}
 				}
-
+				ImGui::SameLine();
 				if (ImGui::Button("Reset"))
 				{
 					ex_PlayerSpeed = default_player_speed;
 					ex_PlayerSensitivity = default_player_sensitivity;
+					ex_FOV = default_fov;
+					// Only reset FOV for actual game worlds, not menu world
+					if (m_World && m_World->p_Player && m_World->GetName() != "MenuWorld")
+					{
+						m_World->p_Player->p_Camera.SetFov(ex_FOV);
+					}
 				}
-
-				ImGui::NewLine();
-
+				ImGui::PopFont();
 				ImGui::End();
 			}
-
-			m_World->SetRenderDistance(renderdistance);
 		}
-
 		else if (m_GameState == GameState::PauseState)
 		{
-			// Darken the background (World is already rendered in OnUpdate)
-			ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 100)); // Dark overlay
-			
+			ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 100));
 			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
 			bool open = true;
-
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
-
-			ImGui::SetNextWindowPos(ImVec2((w / 2) - 220 / 2, (h / 2) - 70 / 2), ImGuiCond_Always);
-
-			if (ImGui::Begin("Pause Menu.", &open, window_flags))
+			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.4f);
+			style.WindowBorderSize = 0.0f;
+			style.WindowPadding = ImVec2(0, 0);
+			if (ImGui::Begin("##Omnia-Pause", &open, window_flags))
 			{
-
-				if (ImGui::Button("RESUME", ImVec2(200, 48)))
-				{
-					m_GameState = GameState::PlayingState;
-				}
-
-				ImGui::NewLine();
-
-				if (ImGui::Button("SETTINGS", ImVec2(200, 48)))
-				{
-					m_GameState = GameState::SettingsState;
-				}
-
-				ImGui::NewLine();
-
-				if (ImGui::Button("QUIT", ImVec2(200, 48)))
+				ImGui::PushFont(Fonts::Exo2::light);
+				ImGui::SetCursorPos(ImVec2(w / 2 - 100, 450)); if (ImGui::Button("Resume", ImVec2(200, 40))) m_GameState = GameState::PlayingState;
+				ImGui::SetCursorPos(ImVec2(w / 2 - 100, 500)); if (ImGui::Button("Settings", ImVec2(200, 40))) m_GameState = GameState::SettingsState;
+				ImGui::SetCursorPos(ImVec2(w / 2 - 100, 550)); if (ImGui::Button("Save and Quit", ImVec2(200, 40)))
 				{
 					WorldFileHandler::SaveWorld(m_World->GetName(), m_World);
 					m_GameState = GameState::MenuState;
-
 					delete m_World;
-					// Recreate Menu World
 					m_World = new World(rand() % 100000, glm::vec2(w, h), "MenuWorld", WorldGenerationType::Generation_Normal);
 					m_World->p_Player->p_FreeFly = true;
-					
-					// Force chunk generation to find ground
 					m_World->OnUpdate(m_Window, false);
-
 					float spawn_y = 100.0f;
 					if (m_World->ChunkExistsInMap(0, 0))
 					{
@@ -642,19 +567,15 @@ namespace Omnia
 							}
 						}
 					}
-
 					m_World->p_Player->p_Position = glm::vec3(0, spawn_y, 0); 
-					m_World->p_Player->p_Camera.SetPosition(glm::vec3(0, spawn_y, 0));
+					m_World->p_Player->p_Camera.SetPosition(glm::vec3(0, spawn_y, 0) + glm::vec3(0.0f, Player::EyeOffsetY, 0.0f));
 				}
-
+				ImGui::PopFont();
 				ImGui::End();
 			}
 		}
-
 		else if (m_GameState == GameState::WorldSelectState)
 		{
-			// m_Renderer2D->RenderQuad(glm::vec2(0, 0), &m_BlurMenuBackground, &m_OrthagonalCamera, w, h);
-
 			if (std::filesystem::exists("Saves/"))
 			{
 				for (auto entry : std::filesystem::directory_iterator("Saves/"))
@@ -662,157 +583,321 @@ namespace Omnia
 					Saves.push_back(entry.path().filename().string());
 				}
 			}
-
 			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
 			bool open = true;
-
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
-
-			ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
-			ImGui::SetNextWindowSize(ImVec2(w - 20, h - 20), ImGuiCond_Always);
-
-			if (ImGui::Begin("Menu", &open, window_flags))
+			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.4f);
+			style.WindowBorderSize = 0.0f;
+			style.WindowPadding = ImVec2(0, 0);
+			if (ImGui::Begin("##Omnia-WorldSelect", &open, window_flags))
 			{
-
-				if (ImGui::Button("Create new world.."))
-				{
-					m_GameState = GameState::WorldCreateState;
-				}
-
-				ImGui::SameLine();
-				ImGui::Text("                     ");
-				ImGui::SameLine();
-
-				if (ImGui::Button("BACK"))
-				{
-					m_GameState = GameState::MenuState;
-				}
-
-				ImGui::Separator();
-				ImGui::NewLine();
-
-				for (int i = 0; i < Saves.size(); i++)
-				{
-					if (ImGui::Button(Saves.at(i).c_str()))
+				ImGui::PushFont(Fonts::Custom::customFont_MainDesc);
+				ImGui::SetCursorPos(ImVec2(450, 230));
+				style.Colors[ImGuiCol_ChildBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.7f);
+				if (ImGui::BeginChild("##Omnia-WorldList", ImVec2(1000, 600), false)) {
+					for (int i = 0; i < Saves.size(); i++)
 					{
-						m_World = WorldFileHandler::LoadWorld(Saves.at(i));
-						m_GameState = GameState::PlayingState;
-
-						EventSystem::Event e;
-						e.type = EventSystem::EventTypes::WindowResize;
-						m_EventQueue.push_back(e);
-						break;
+						if (ImGui::Button(Saves.at(i).c_str(), ImVec2(1000, 75)))
+						{
+							m_World = WorldFileHandler::LoadWorld(Saves.at(i));
+							m_GameState = GameState::PlayingState;
+							EventSystem::Event e;
+							e.type = EventSystem::EventTypes::WindowResize;
+							m_EventQueue.push_back(e);
+							break;
+						}
 					}
-
-					ImGui::Separator();
+					ImGui::EndChild();
 				}
-
-				ImGui::NewLine();
-
+				ImGui::SetCursorPos(ImVec2(450, 850));
+				if (ImGui::Button("Create")) m_GameState = GameState::WorldCreateState;
+				ImGui::SameLine();
+				if (ImGui::Button("Back")) m_GameState = GameState::MenuState;
+				ImGui::PopFont();
 				ImGui::End();
 			}
 		}
-
 		else if (m_GameState == GameState::WorldCreateState)
 		{
-// m_Renderer2D->RenderQuad(glm::vec2(0, 0), &m_BlurMenuBackground, &m_OrthagonalCamera, w, h);
-
 			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
 			bool open = true;
-
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
-
-			ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
-			ImGui::SetNextWindowSize(ImVec2(w - 20, h - 20), ImGuiCond_Always);
-
-			if (ImGui::Begin("World Create", &open, window_flags))
+			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.4f);
+			style.WindowBorderSize = 0.0f;
+			style.WindowPadding = ImVec2(0, 0);
+			if (ImGui::Begin("##Omnia-CreateWorld", &open, window_flags))
 			{
-
-				if (ImGui::Button("BACK"))
-				{
-					m_GameState = GameState::WorldSelectState;
-				}
-
-				ImGui::Text("\n");
-				ImGui::Separator();
-				ImGui::Text("\n");
-				ImGui::Text("Create your new world!");
-				ImGui::Text("\n");
-				ImGui::InputText("World Name", input, 63);
-				ImGui::InputInt("Seed", &seed);
-				ImGui::Text("\n\n");
-				ImGui::RadioButton("Normal", &world_type, (int)WorldGenerationType::Generation_Normal);
-				ImGui::RadioButton("Islands", &world_type, (int)WorldGenerationType::Generation_Islands);
-				ImGui::RadioButton("Hilly", &world_type, (int)WorldGenerationType::Generation_Hilly);
-				ImGui::RadioButton("Flat", &world_type, (int)WorldGenerationType::Generation_Flat);
-				ImGui::RadioButton("Flat without Structures", &world_type, (int)WorldGenerationType::Generation_FlatWithoutStructures);
-
-				ImGui::Text("\n\n");
-
-				if (ImGui::Button("Create!", ImVec2(200,200)))
+				ImGui::PushFont(Fonts::Custom::customFont_MainDesc);
+				ImGui::SetCursorPos(ImVec2(450, 440));
+				ImGui::SetNextItemWidth(950.0f); ImGui::InputText("World Name", input, sizeof(input));
+				ImGui::SetCursorPos(ImVec2(450, 480));
+				ImGui::SetNextItemWidth(950.0f); ImGui::InputInt("Seed", &seed);
+				const char* world_types[] = { "Normal", "Islands", "Hilly", "Flat", "Flat+" };
+				ImGui::SetCursorPos(ImVec2(450, 520));
+				ImGui::SetNextItemWidth(950.0f); ImGui::Combo("World Type", &world_type, world_types, IM_ARRAYSIZE(world_types));
+				ImGui::SetCursorPos(ImVec2(450, 570));
+				if (ImGui::Button("Create World"))
 				{
 					bool isValid = FilenameIsValid(input);
-
 					if (isValid)
 					{
 						m_World = new World(seed, glm::vec2(w, h), input, static_cast<WorldGenerationType>(world_type));
 						m_GameState = GameState::PlayingState;
 						memset(input, '\0', 64);
+						show_invalid_name_error = false;
 					}
-
-					else
-					{
-						Logger::LogToConsole("INVALID WORLD NAME GIVEN!");
+					else {
+						show_invalid_name_error = true;
+						error_display_time = glfwGetTime();
 					}
 				}
-
+				if (show_invalid_name_error)
+				{
+					double current_time = glfwGetTime();
+					if (current_time - error_display_time < 5.0)
+					{
+						ImGui::SameLine();
+						ImGui::TextColored(ImColor(255, 0, 0, 255), "Invalid World Name!");
+					}
+					else
+					{
+						show_invalid_name_error = false;
+					}
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Back")) m_GameState = GameState::WorldSelectState;
+				ImGui::PopFont();
 				ImGui::End();
 			}
 		}
-
 		else if (m_GameState == GameState::HelpState)
 		{
-// m_Renderer2D->RenderQuad(glm::vec2(0, 0), &m_BlurMenuBackground, &m_OrthagonalCamera, w, h);
 			glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
 			bool open = true;
-
 			ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
-
-			ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
-
-			if (ImGui::Begin("Help Menu", 0, window_flags))
+			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.4f);
+			style.WindowBorderSize = 0.0f;
+			style.WindowPadding = ImVec2(0, 0);
+			if (ImGui::Begin("##Omnia-Help", 0, window_flags))
 			{
-				if (ImGui::Button("BACK"))
+				ImGui::PushFont(Fonts::Custom::customFont_MainDesc);
+				ImGui::SetCursorPos(ImVec2(450, 340)); ImGui::Text("A Voxel-Based Sandbox Game");
+				ImGui::SetCursorPos(ImVec2(450, 360)); ImGui::Text("By Saiyan0x (timucinozdemir0@gmail.com)");
+				ImGui::SetCursorPos(ImVec2(450, 380)); ImGui::Text("Discord: saiyan0x");
+				ImGui::SetCursorPos(ImVec2(450, 400)); ImGui::Text("If you like this project. Please consider starring it on GitHub");
+				ImGui::SetCursorPos(ImVec2(450, 420)); ImGui::Text("All art and resources are not mine. Credits go to their respective owners");
+				ImGui::SetCursorPos(ImVec2(450, 440)); ImGui::Text("All Credits Going to Original Creator: https://github.com/swr06/Minecraft");
+				ImGui::SetCursorPos(ImVec2(450, 480)); ImGui::Text("--- Instructions ---");
+				ImGui::SetCursorPos(ImVec2(450, 500)); ImGui::Text("Toggle Debug Context: Ctrl + Shift + F12");
+				ImGui::SetCursorPos(ImVec2(450, 520)); ImGui::Text("Movement: W S A D");
+				ImGui::SetCursorPos(ImVec2(450, 540)); ImGui::Text("Space: Fly Up");
+				ImGui::SetCursorPos(ImVec2(450, 560)); ImGui::Text("Left Shift: Fly Down");
+				ImGui::SetCursorPos(ImVec2(450, 580)); ImGui::Text("Right Mouse Button: Place Block");
+				ImGui::SetCursorPos(ImVec2(450, 600)); ImGui::Text("Left Mouse Button: Break Block");
+				ImGui::SetCursorPos(ImVec2(450, 620)); ImGui::Text("Change Current Block: (Q) Previous / (E) Next");
+				ImGui::SetCursorPos(ImVec2(450, 640)); ImGui::Text("Toggle VSync: V");
+				ImGui::SetCursorPos(ImVec2(450, 660)); ImGui::Text("Toggle Collision Mode (Noclip): F");
+				ImGui::SetCursorPos(ImVec2(450, 680)); ImGui::Text("Reset Sun Position: G");
+				ImGui::SetCursorPos(ImVec2(450, 720)); if (ImGui::Button("Back")) m_GameState = GameState::MenuState;
+				ImGui::PopFont();
+				ImGui::End();
+			}
+		}
+		if (m_InventoryOpen && m_GameState == GameState::PlayingState && m_World)
+		{
+			// Arka planı karart
+			ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 150));
+
+			// Envanter paneli - ekranın ortasında
+			int slots_per_row = 10;
+			float slot_size = 60.0f;
+			float slot_spacing = 10.0f;
+			float inv_width = slots_per_row * slot_size + (slots_per_row + 3) * slot_spacing; // 9 slot * 60px + 10 boşluk * 10px
+			float inv_height = 600.0f; // Sabit yükseklik, scrollable içerik
+			float inv_x = (w - inv_width) / 2.0f;
+			float inv_y = (h - inv_height) / 2.0f;
+
+			// Hotbar konumu (inventory açıkken ayrı overlay window'da render edilecek)
+			float hotbar_width = 9 * 50.0f + 10 * 5.0f;
+			float hotbar_x = inv_x + (inv_width - hotbar_width) / 2.0f;
+			float hotbar_y = inv_y + inv_height + 20.0f;
+
+			ImGuiWindowFlags inv_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+			ImGui::SetNextWindowPos(ImVec2(inv_x, inv_y), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2(inv_width, inv_height), ImGuiCond_Always);
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.7f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
+			
+			if (ImGui::Begin("##Inventory", nullptr, inv_flags))
+			{
+				// Tüm blokları topla (Air ve UnknownBlockType hariç)
+				static std::vector<BlockType> all_blocks;
+				static bool blocks_initialized = false;
+				
+				if (!blocks_initialized)
 				{
-					m_GameState = GameState::MenuState;
+					blocks_initialized = true;
+					for (int i = 0; i <= (int)BlockType::Air; i++)
+					{
+						BlockType block = (BlockType)i;
+						if (block != BlockType::Air && block != BlockType::UnknownBlockType)
+						{
+							all_blocks.push_back(block);
+						}
+					}
 				}
 
-				ImGui::Separator();
-				ImGui::Text("\n");
-				ImGui::Text("A Voxel-Based Sandbox Game");
-				ImGui::Text("By Samuel Rasquinha (samuelrasquinha@gmail.com)");
-				ImGui::Text("Discord : swr#1899");
-				ImGui::Text("If you like this project. Please consider starring it on GitHub");
-				ImGui::Text("All art and resources are not mine. Credits go to their respective owners");
-				ImGui::Text("\n\n");
-				ImGui::Text("Instructions : ");
-				ImGui::Text("TOGGLE DEBUG MENU : F3");
-				ImGui::Text("MOVEMENT - W S A D");
-				ImGui::Text("FLY - SPACE/LEFT SHIFT");
-				ImGui::Text("BLOCK EDITING - LEFT/RIGHT MOUSE BUTTONS");
-				ImGui::Text("CHANGE CURRENT BLOCK - (Q) or (E)");
-				ImGui::Text("TOGGLE VSYNC - (V)");
-				ImGui::Text("TOGGLE COLLISION DETECTION / FREEFLY - (F)");
-				ImGui::Text("RESET SUN - (G)");
-
+				ImTextureID atlas_tex = (ImTextureID)(intptr_t)m_World->GetRenderer()->GetAtlasTexture()->GetTextureID();
+				float atlas_w = (float)m_World->GetRenderer()->GetAtlasTexture()->GetWidth();
+				float atlas_h = (float)m_World->GetRenderer()->GetAtlasTexture()->GetHeight();
+				
+				int total_rows = (int)std::ceil((float)all_blocks.size() / (float)slots_per_row);
+				
+				for (int row = 0; row < total_rows; row++)
+				{
+					// Satır başında boşluk bırak (ortalamak için)
+					int blocks_in_row = std::min(slots_per_row, (int)all_blocks.size() - row * slots_per_row);
+					if (blocks_in_row < slots_per_row)
+					{
+						// Eksik slotlar varsa ortalamak için boşluk ekle
+						float row_width = blocks_in_row * slot_size + (blocks_in_row - 1) * slot_spacing;
+						float padding = (inv_width - 20.0f - row_width) / 2.0f; // 20.0f = window padding
+						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + padding);
+					}
+					
+					for (int col = 0; col < slots_per_row; col++)
+					{
+						int index = row * slots_per_row + col;
+						if (index >= (int)all_blocks.size())
+							break;
+						
+						BlockType block = all_blocks[index];
+						ImGui::PushID(index);
+						
+						// Slot arka planı için bir group/frame
+						ImGui::BeginGroup();
+						
+						// Slot arka planı için button frame
+						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
+						ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.9f));
+						ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+						
+						// Blok texture'ı
+						const std::array<uint16_t, 8>& uv_raw = BlockDatabase::GetBlockTexture(block, BlockFaceType::front);
+						float x1 = uv_raw[2] / atlas_w;
+						float y1 = uv_raw[3] / atlas_h;
+						float x2 = uv_raw[0] / atlas_w;
+						float y2 = uv_raw[5] / atlas_h;
+						ImVec2 uv0 = ImVec2(x1, y2);
+						ImVec2 uv1 = ImVec2(x2, y1);
+						
+						// ImageButton kullan (tıklanabilir ve görsel)
+						ImGui::ImageButton(atlas_tex, ImVec2(slot_size, slot_size), uv0, uv1, 0, ImVec4(0.2f, 0.2f, 0.2f, 0.8f), ImVec4(1,1,1,1));
+						
+						// Drag başlatma (envanter'den - tıklama veya sürükleme)
+						if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !m_IsDragging)
+						{
+							m_IsDragging = true;
+							m_DraggedBlock = block;
+						}
+						
+						// Sürükleme ile de drag başlat
+						if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !m_IsDragging)
+						{
+							m_IsDragging = true;
+							m_DraggedBlock = block;
+						}
+						
+						// Drop (envanter'e geri - swap için)
+						if (m_IsDragging && ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+						{
+							BlockType temp = block;
+							all_blocks[index] = m_DraggedBlock;
+							m_DraggedBlock = temp;
+							if (m_DraggedBlock == BlockType::Air)
+								m_IsDragging = false;
+						}
+						
+						ImGui::PopStyleColor(3);
+						
+						// Tooltip
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::BeginTooltip();
+							ImGui::Text("%s", BlockDatabase::GetBlockName(block).c_str());
+							ImGui::EndTooltip();
+						}
+						
+						ImGui::EndGroup();
+						
+						ImGui::PopID();
+						
+						// Sonraki slot pozisyonu
+						if (col < slots_per_row - 1 && col < blocks_in_row - 1)
+						{
+							ImGui::SameLine(0, slot_spacing);
+						}
+					}
+					
+					// Yeni satır için cursor'ı ayarla
+					if (row < total_rows - 1)
+					{
+						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + slot_spacing);
+						ImGui::SetCursorPosX(10.0f); // Window padding'e geri dön
+					}
+				}
+				
 				ImGui::End();
+			}
+
+			// Hotbar overlay - inventory penceresinin clip'ine takılmasın diye ayrı window
+			{
+				ImGuiWindowFlags hotbar_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+					ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground;
+				ImGui::SetNextWindowPos(ImVec2(hotbar_x, hotbar_y), ImGuiCond_Always);
+				ImGui::SetNextWindowSize(ImVec2(hotbar_width, 50.0f), ImGuiCond_Always);
+				if (ImGui::Begin("##InventoryHotbarOverlay", nullptr, hotbar_flags))
+				{
+					RenderHotbar(hotbar_x, hotbar_y, hotbar_width);
+					ImGui::End();
+				}
+			}
+			
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor();
+			
+			// Drag & drop: Mouse'u takip eden blok texture'ı
+			if (m_IsDragging && m_DraggedBlock != BlockType::Air)
+			{
+				ImVec2 mouse_pos = ImGui::GetMousePos();
+				ImTextureID atlas_tex = (ImTextureID)(intptr_t)m_World->GetRenderer()->GetAtlasTexture()->GetTextureID();
+				float atlas_w = (float)m_World->GetRenderer()->GetAtlasTexture()->GetWidth();
+				float atlas_h = (float)m_World->GetRenderer()->GetAtlasTexture()->GetHeight();
+				const std::array<uint16_t, 8>& uv_raw = BlockDatabase::GetBlockTexture(m_DraggedBlock, BlockFaceType::front);
+				float x1 = uv_raw[2] / atlas_w;
+				float y1 = uv_raw[3] / atlas_h;
+				float x2 = uv_raw[0] / atlas_w;
+				float y2 = uv_raw[5] / atlas_h;
+				ImVec2 uv0 = ImVec2(x1, y2);
+				ImVec2 uv1 = ImVec2(x2, y1);
+				ImGui::GetForegroundDrawList()->AddImage(atlas_tex, ImVec2(mouse_pos.x - 20, mouse_pos.y - 20), ImVec2(mouse_pos.x + 20, mouse_pos.y + 20), uv0, uv1);
+				
+				// Envanter dışına tıklayınca drag'i iptal et
+				if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
+				{
+					m_IsDragging = false;
+					m_DraggedBlock = BlockType::Air;
+				}
 			}
 		}
 	}
-
 	void Application::OnEvent(EventSystem::Event e)
 	{
 		switch (e.type)
@@ -844,45 +929,231 @@ namespace Omnia
 
 		case EventSystem::EventTypes::KeyPress:
 		{
-			if (e.key == GLFW_KEY_ESCAPE && m_GameState == GameState::PlayingState)
+			if (e.key == GLFW_KEY_ESCAPE)
 			{
-				m_GameState = GameState::PauseState;
+				if (m_GameState == GameState::PlayingState && m_InventoryOpen)
+				{
+					m_InventoryOpen = false;
+					// Envanter kapandığında mouse pozisyonunu ekranın ortasına ayarla
+					int w, h;
+					glfwGetFramebufferSize(m_Window, &w, &h);
+					double center_x = w / 2.0;
+					double center_y = h / 2.0;
+					glfwSetCursorPos(m_Window, center_x, center_y);
+					
+					// Kameranın mouse pozisyon takibini sıfırla
+					if (m_World && m_World->p_Player)
+					{
+						m_World->p_Player->p_Camera.ResetMousePosition(center_x, center_y);
+					}
+					
+					glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				}
+				else
+				{
+					if (m_GameState == GameState::PlayingState) m_GameState = GameState::PauseState;
+					else if (m_GameState == GameState::PauseState) m_GameState = GameState::PlayingState;
+				}
 			}
-
-			else if (e.key == GLFW_KEY_F3 && m_GameState == GameState::PlayingState)
-			{
-				m_ShowDebugInfo = !m_ShowDebugInfo;
-			}
-
-			else if (e.key == GLFW_KEY_ESCAPE && m_GameState == GameState::PauseState)
-			{
-				m_GameState = GameState::PlayingState;
-			}
-
+			else if (e.key == GLFW_KEY_F12 && e.mods & GLFW_MOD_CONTROL && e.mods & GLFW_MOD_SHIFT) m_ShowDebugInfo = !m_ShowDebugInfo;
 			else if (e.key == GLFW_KEY_V)
 			{
 				m_VSync = !m_VSync;
 				glfwSwapInterval(m_VSync);
 			}
-
+			else if (e.key == GLFW_KEY_TAB && m_GameState == GameState::PlayingState)
+			{
+				m_InventoryOpen = !m_InventoryOpen;
+				if (m_InventoryOpen)
+				{
+					glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+				}
+				else
+				{
+					// Envanter kapandığında mouse pozisyonunu ekranın ortasına ayarla
+					int w, h;
+					glfwGetFramebufferSize(m_Window, &w, &h);
+					double center_x = w / 2.0;
+					double center_y = h / 2.0;
+					glfwSetCursorPos(m_Window, center_x, center_y);
+					
+					// Kameranın mouse pozisyon takibini sıfırla
+					if (m_World && m_World->p_Player)
+					{
+						m_World->p_Player->p_Camera.ResetMousePosition(center_x, center_y);
+					}
+					
+					glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				}
+			}
+			// Hotbar slot seçimi (1-9 tuşları)
+			else if (m_GameState == GameState::PlayingState && !m_InventoryOpen && e.key >= GLFW_KEY_1 && e.key <= GLFW_KEY_9)
+			{
+				int slot = e.key - GLFW_KEY_1; // Convert key to slot index (0-8)
+				if (slot >= 0 && slot < 9)
+				{
+					m_CurrentHotbarSlot = slot;
+					if (m_World && m_HotbarSlots[slot] != BlockType::Air)
+					{
+						m_World->p_Player->p_CurrentHeldBlock = (uint8_t)m_HotbarSlots[slot];
+					}
+					else if (m_World)
+					{
+						m_World->p_Player->p_CurrentHeldBlock = (uint8_t)BlockType::Air;
+					}
+				}
+			}
+			break;
+			}
+		
+		case EventSystem::EventTypes::MouseScroll:
+		{
+			// Hotbar slot seçimi (mouse wheel)
+			if (m_GameState == GameState::PlayingState && !m_InventoryOpen && m_World)
+			{
+				// Scroll up = next slot
+				if (e.msy > 0.0f)
+				{
+					m_CurrentHotbarSlot = (m_CurrentHotbarSlot + 1) % 9;
+				}
+				// Scroll down = previous slot
+				else if (e.msy < 0.0f)
+				{
+					m_CurrentHotbarSlot = (m_CurrentHotbarSlot - 1 + 9) % 9;
+				}
+				
+				// Seçili slot'taki bloğu player'a ver
+				if (m_HotbarSlots[m_CurrentHotbarSlot] != BlockType::Air)
+				{
+					m_World->p_Player->p_CurrentHeldBlock = (uint8_t)m_HotbarSlots[m_CurrentHotbarSlot];
+				}
+				else
+				{
+					m_World->p_Player->p_CurrentHeldBlock = (uint8_t)BlockType::Air;
+				}
+			}
 			break;
 		}
 		}
-
-		if (m_World && m_GameState == GameState::PlayingState)
+		// Envanter açıkken mouse event'lerini işleme (kamera dönmesin)
+		if (m_World && m_GameState == GameState::PlayingState) 
 		{
-			m_World->OnEvent(e);
+			if (m_InventoryOpen)
+			{
+				// Envanter açıkken sadece window resize gibi önemli event'leri işle
+				// Mouse move, mouse press, mouse scroll gibi event'leri işleme
+				if (e.type == EventSystem::EventTypes::WindowResize)
+				{
+					m_World->OnEvent(e);
+				}
+				// Mouse event'lerini tamamen ignore et
+			}
+			else
+			{
+				// Normal oyun durumunda tüm event'leri işle
+				m_World->OnEvent(e);
+			}
 		}
 	}
-
 	void Application::PollEvents()
 	{
 		for (int i = 0; i < m_EventQueue.size(); i++)
 		{
 			OnEvent(m_EventQueue[i]);
 		}
-
 		m_EventQueue.clear();
+	}
+	void Application::RenderHotbar(float x, float y, float width)
+	{
+		if (!m_World) return;
+		
+		ImTextureID atlas_tex = (ImTextureID)(intptr_t)m_World->GetRenderer()->GetAtlasTexture()->GetTextureID();
+		float atlas_w = (float)m_World->GetRenderer()->GetAtlasTexture()->GetWidth();
+		float atlas_h = (float)m_World->GetRenderer()->GetAtlasTexture()->GetHeight();
+		
+		float slot_size = 50.0f;
+		float slot_spacing = 5.0f;
+		
+		// Screen space pozisyon kullan (hotbar'ı farklı UI pencerelerinden güvenle çizebilmek için)
+		ImGui::SetCursorScreenPos(ImVec2(x, y));
+		
+		for (int i = 0; i < 9; i++)
+		{
+			BlockType block = m_HotbarSlots[i];
+			bool is_selected = (m_CurrentHotbarSlot == i);
+			
+			ImGui::PushID(1000 + i); // Unique ID for hotbar slots
+			ImVec2 p = ImGui::GetCursorScreenPos();
+			
+			// Slot arka planı
+			ImGui::GetBackgroundDrawList()->AddRectFilled(p, ImVec2(p.x + slot_size, p.y + slot_size), IM_COL32(50, 50, 50, 200), 5.0f);
+			if (is_selected) 
+				ImGui::GetBackgroundDrawList()->AddRect(p, ImVec2(p.x + slot_size, p.y + slot_size), IM_COL32(255, 255, 255, 255), 5.0f, 0, 3.0f);
+			
+			// Drag & drop için invisible button (tüm slot için)
+			ImGui::SetCursorScreenPos(p);
+			ImGui::InvisibleButton("##HotbarSlot", ImVec2(slot_size, slot_size));
+			
+			// Blok render etme
+			if (block != BlockType::Air)
+			{
+				const std::array<uint16_t, 8>& uv_raw = BlockDatabase::GetBlockTexture(block, BlockFaceType::front);
+				float x1 = uv_raw[2] / atlas_w;
+				float y1 = uv_raw[3] / atlas_h;
+				float x2 = uv_raw[0] / atlas_w;
+				float y2 = uv_raw[5] / atlas_h;
+				ImVec2 uv0 = ImVec2(x1, y2);
+				ImVec2 uv1 = ImVec2(x2, y1);
+				
+				// Blok texture'ı
+				ImGui::GetBackgroundDrawList()->AddImage(atlas_tex, ImVec2(p.x + 5, p.y + 5), ImVec2(p.x + 45, p.y + 45), uv0, uv1);
+				
+				// Drag başlatma (hotbar'dan)
+				if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !m_IsDragging)
+				{
+					m_IsDragging = true;
+					m_DraggedBlock = block;
+					m_HotbarSlots[i] = BlockType::Air;
+				}
+			}
+			
+			// Drop (hotbar'a - hem envanter'den hem hotbar'dan)
+			ImVec2 mouse_pos = ImGui::GetMousePos();
+			bool mouse_in_slot = (mouse_pos.x >= p.x && mouse_pos.x <= (p.x + slot_size) && mouse_pos.y >= p.y && mouse_pos.y <= (p.y + slot_size));
+			if (m_IsDragging && mouse_in_slot && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			{
+				// Swap blocks
+				BlockType temp = m_HotbarSlots[i];
+				m_HotbarSlots[i] = m_DraggedBlock;
+				m_DraggedBlock = temp;
+				if (m_DraggedBlock == BlockType::Air)
+					m_IsDragging = false;
+			}
+			
+			// Seçim için tıklama
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !m_IsDragging)
+			{
+				m_CurrentHotbarSlot = i;
+			}
+			
+			ImGui::PopID();
+			
+			// Sonraki slot pozisyonu
+			if (i < 8)
+			{
+				ImGui::SameLine(0, slot_spacing);
+			}
+		}
+		
+		// Seçili slot'taki bloğu player'a ver
+		if (m_HotbarSlots[m_CurrentHotbarSlot] != BlockType::Air)
+		{
+			m_World->p_Player->p_CurrentHeldBlock = (uint8_t)m_HotbarSlots[m_CurrentHotbarSlot];
+		}
+		else
+		{
+			m_World->p_Player->p_CurrentHeldBlock = (uint8_t)BlockType::Air;
+		}
 	}
 
 	Application* GetOmniaApp()

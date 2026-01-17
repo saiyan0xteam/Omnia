@@ -69,7 +69,7 @@ namespace Omnia
 
 		// Set the players position
 		p_Player->p_Position = glm::vec3(0, 140, 0);
-		p_Player->p_Camera.SetPosition(p_Player->p_Position);
+		p_Player->p_Camera.SetPosition(p_Player->p_Position + glm::vec3(0.0f, Player::EyeOffsetY, 0.0f));
 
 		Logger::LogToConsole("The World was Constructed!");
 
@@ -98,7 +98,7 @@ namespace Omnia
 	/*
 		The World::OnUpdate function is called every frame, it updates the blocks, lighting, player etc..
 	*/
-	void World::OnUpdate(GLFWwindow* window, bool update_player)
+	void World::OnUpdate(GLFWwindow* window, float deltaTime, bool update_player)
 	{
 		int render_distance_x = render_distance, render_distance_z = render_distance;
 
@@ -151,7 +151,7 @@ namespace Omnia
 
 		if (update_player)
 		{
-			p_Player->OnUpdate(window);
+			p_Player->OnUpdate(window, deltaTime);
 		}
 
 		// Update the view frustum
@@ -344,28 +344,7 @@ namespace Omnia
 			}
 		}
 
-		if (e.type == EventSystem::EventTypes::KeyPress && e.key == GLFW_KEY_E)
-		{
-			p_Player->p_CurrentHeldBlock++;
-
-			if (p_Player->p_CurrentHeldBlock == BlockType::Water)
-			{
-				p_Player->p_CurrentHeldBlock = BlockType::Grass;
-			}
-		}
-
-		if (e.type == EventSystem::EventTypes::KeyPress && e.key == GLFW_KEY_Q)
-		{
-			if (p_Player->p_CurrentHeldBlock > BlockType::Grass)
-			{
-				p_Player->p_CurrentHeldBlock--;
-			}
-
-			else
-			{
-				p_Player->p_CurrentHeldBlock = BlockType::Clay;
-			}
-		}
+		// Hotbar selection now handled by number keys (1-9) and mouse scroll in Player.cpp
 
 		if (e.type == EventSystem::EventTypes::KeyPress && e.key == GLFW_KEY_G)
 		{
@@ -459,12 +438,14 @@ namespace Omnia
 	*/
 	bool World::TestRayPlayerCollision(const glm::vec3& ray_block)
 	{
+		const glm::vec3 player_dim = glm::vec3(0.9f, 1.8f, 0.9f);
+		const glm::vec3 player_half = player_dim * 0.5f;
 		glm::vec3 pos = glm::vec3(
-			p_Player->p_Position.x,
-			p_Player->p_Position.y,
-			p_Player->p_Position.z);
+			p_Player->p_Position.x - player_half.x,
+			p_Player->p_Position.y - player_half.y,
+			p_Player->p_Position.z - player_half.z);
 
-		if (TestAABB3DCollision(pos, glm::vec3(0.75f, 1.5f, 0.75f), ray_block, glm::vec3(1.0f, 1.0f, 1.0f)))
+		if (TestAABB3DCollision(pos, player_dim, ray_block, glm::vec3(1.0f, 1.0f, 1.0f)))
 		{
 			return true;
 		}
@@ -511,7 +492,7 @@ namespace Omnia
 	*/
 	void World::RayCast(bool place)
 	{
-		glm::vec3 position = p_Player->p_Position;
+		glm::vec3 position = p_Player->p_Camera.GetPosition();
 		const glm::vec3& direction = p_Player->p_Camera.GetFront();
 		int max = 50; // block reach
 

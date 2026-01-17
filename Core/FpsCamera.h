@@ -130,6 +130,9 @@ namespace Omnia
 			RecalculateViewMatrix();
 		}
 
+		// Reset mouse position tracking (useful when cursor mode changes)
+		void ResetMousePosition(double xpos, double ypos);
+
 		void OnUpdate();
 
 	private : 

@@ -46,7 +46,7 @@ namespace Omnia
 		World(int seed, const glm::vec2& window_size, const std::string& world_name, WorldGenerationType world_gen_type);
 		~World();
 
-		void OnUpdate(GLFWwindow* window, bool update_player = true);
+		void OnUpdate(GLFWwindow* window, float deltaTime, bool update_player = true);
 		void RenderWorld(bool show_crosshair = true);
 		void OnEvent(EventSystem::Event e);
 		void SetRenderDistance(int x);

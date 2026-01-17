@@ -10,9 +10,10 @@ namespace Omnia
 	extern float ex_PlayerSpeed;
 	extern float ex_PlayerSensitivity;
 
-	void Player::OnUpdate(GLFWwindow* window)
+	void Player::OnUpdate(GLFWwindow* window, float deltaTime)
 	{
-		const float camera_speed = ex_PlayerSpeed;
+		// Scale camera speed by delta time for frame-independent movement
+		const float camera_speed = ex_PlayerSpeed * deltaTime * 60.0f; // Multiply by 60 to maintain similar feel at 60 FPS
 
 		p_Camera.ResetAcceleration();
 		FPSCamera cam = p_Camera;
@@ -45,78 +46,129 @@ namespace Omnia
 			p_Camera.ApplyAcceleration(p_Camera.GetRight() * camera_speed);
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		// Creative fly toggle: Shift + double Space
+		const bool is_shift_down = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
+		const bool is_space_down = (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS);
+		const bool space_pressed = (is_space_down && !m_WasSpaceDown);
+		m_WasSpaceDown = is_space_down;
+		if (is_shift_down && space_pressed)
 		{
-			p_Camera.ApplyAcceleration(p_Camera.GetUp() * camera_speed);
+			const double now = glfwGetTime();
+			const double double_tap_threshold_s = 0.30;
+			if (m_LastShiftSpacePressTime > 0.0 && (now - m_LastShiftSpacePressTime) <= double_tap_threshold_s)
+			{
+				p_CreativeFly = !p_CreativeFly;
+				m_VerticalVelocity = 0.0f;
+				m_LastShiftSpacePressTime = 0.0;
+			}
+			else
+			{
+				m_LastShiftSpacePressTime = now;
+			}
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+		const bool allow_collision_physics = (!p_FreeFly && !p_CreativeFly);
+
+		// Vertical movement when creative fly OR noclip is enabled
+		if (p_CreativeFly || p_FreeFly)
 		{
-			p_Camera.ApplyAcceleration(-(p_Camera.GetUp() * camera_speed));
+			if (is_space_down)
+			{
+				p_Camera.ApplyAcceleration(p_Camera.GetUp() * camera_speed);
+			}
+
+			if (is_shift_down)
+			{
+				p_Camera.ApplyAcceleration(-(p_Camera.GetUp() * camera_speed));
+			}
+		}
+		else if (allow_collision_physics)
+		{
+			// Jump only when grounded
+			if (space_pressed && m_IsGrounded)
+			{
+				m_IsGrounded = false;
+				m_VerticalVelocity = 6.0f;
+			}
 		}
 
 		p_Camera.OnUpdate();
-		glm::vec3 new_pos = p_Camera.GetPosition();
-		glm::vec3 old_pos = cam.GetPosition();
 
-		if (new_pos != old_pos)
+		// Apply gravity when neither noclip nor creative flight is enabled
+		if (allow_collision_physics)
+		{
+			const float gravity = -18.0f;
+			m_VerticalVelocity += gravity * deltaTime;
+			glm::vec3* camera_pos = (glm::vec3*)&p_Camera.GetPosition();
+			camera_pos->y += m_VerticalVelocity * deltaTime;
+		}
+		else
+		{
+			m_IsGrounded = false;
+			m_VerticalVelocity = 0.0f;
+		}
+
+		glm::vec3 new_eye_pos = p_Camera.GetPosition();
+		glm::vec3 old_eye_pos = cam.GetPosition();
+		glm::vec3 new_center_pos = new_eye_pos - glm::vec3(0.0f, EyeOffsetY, 0.0f);
+		glm::vec3 old_center_pos = old_eye_pos - glm::vec3(0.0f, EyeOffsetY, 0.0f);
+
+		if (new_eye_pos != old_eye_pos)
 		{
 			glm::vec3* camera_pos = (glm::vec3*)&p_Camera.GetPosition();
 
-			if (TestBlockCollision(glm::vec3(new_pos.x, old_pos.y, old_pos.z )))
+			if (TestBlockCollision(glm::vec3(new_center_pos.x, old_center_pos.y, old_center_pos.z)))
 			{
-				camera_pos->x = old_pos.x;
+				camera_pos->x = old_eye_pos.x;
 				p_Camera.ResetVelocity();
 				p_Camera.ResetAcceleration();
 			}
 
-			if (TestBlockCollision(glm::vec3(old_pos.x, old_pos.y, new_pos.z)))
+			if (TestBlockCollision(glm::vec3(old_center_pos.x, old_center_pos.y, new_center_pos.z)))
 			{
-				camera_pos->z = old_pos.z;
+				camera_pos->z = old_eye_pos.z;
 				p_Camera.ResetVelocity();
 				p_Camera.ResetAcceleration();
 			}
 
-			if (TestBlockCollision(glm::vec3(old_pos.x, new_pos.y, old_pos.z)))
+			if (TestBlockCollision(glm::vec3(old_center_pos.x, new_center_pos.y, old_center_pos.z)))
 			{
-				camera_pos->y = old_pos.y;
+				camera_pos->y = old_eye_pos.y;
+				if (allow_collision_physics)
+				{
+					// Ground / ceiling hit
+					m_IsGrounded = (new_center_pos.y < old_center_pos.y);
+					m_VerticalVelocity = 0.0f;
+				}
 				p_Camera.ResetVelocity();
 				p_Camera.ResetAcceleration();
+			}
+			else
+			{
+				if (allow_collision_physics)
+				{
+					m_IsGrounded = false;
+				}
 			}
 
 			p_Camera.Refresh();
 		}
 
 		// Update the player's position
-		p_Position = p_Camera.GetPosition();
+		p_Position = p_Camera.GetPosition() - glm::vec3(0.0f, EyeOffsetY, 0.0f);
 	}
+
 
 	void Player::OnEvent(EventSystem::Event e)
 	{
-		if (e.type == EventSystem::EventTypes::MouseScroll)
-		{
-			if (e.msy > 0.0f)
-			{
-				if (p_Camera.GetFov() < 71)
-				{
-					p_Camera.SetFov(p_Camera.GetFov() + 0.1);
-				}
-			}
-
-			else if (e.msy < 0.0f)
-			{
-				if (p_Camera.GetFov() > 69.50)
-				{
-					p_Camera.SetFov(p_Camera.GetFov() - 0.1);
-				}
-			}
-		}
-
-		else if (e.type == EventSystem::EventTypes::KeyPress)
+		// Hotbar kontrolü artık Application'da yapılıyor
+		
+		if (e.type == EventSystem::EventTypes::KeyPress)
 		{
 			if (e.key == GLFW_KEY_F)
 			{
 				p_FreeFly = !p_FreeFly;
+				m_VerticalVelocity = 0.0f;
 			}
 		}
 
@@ -148,11 +200,12 @@ namespace Omnia
 			return false;
 		}
 
-		// Convert center position to top-left position
+		const glm::vec3 player_dim = glm::vec3(0.9f, 1.8f, 0.9f);
+		const glm::vec3 player_half = player_dim * 0.5f;
 		glm::vec3 pos = glm::vec3(
-			position.x - 0.375f,
-			position.y - 0.75,
-			position.z - 0.375f);
+			position.x - player_half.x,
+			position.y - player_half.y,
+			position.z - player_half.z);
 
 		glm::ivec3 player_block = {
 			(int)floor(pos.x),
@@ -172,7 +225,7 @@ namespace Omnia
 
 						if (block && block->Collidable())
 						{
-							if (Test3DAABBCollision(pos, glm::vec3(0.75f, 1.5f, 0.75f), glm::vec3(i, j, k), glm::vec3(1, 1, 1)))
+							if (Test3DAABBCollision(pos, player_dim, glm::vec3(i, j, k), glm::vec3(1, 1, 1)))
 							{
 								return true;
 							}

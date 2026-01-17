@@ -72,6 +72,13 @@ namespace Omnia
 		this->SetFront(front);
 	}
 
+	void FPSCamera::ResetMousePosition(double xpos, double ypos)
+	{
+		_FirstMove = false;
+		_PrevMx = xpos;
+		_PrevMy = ypos;
+	}
+
 	void FPSCamera::SetPosition(const glm::vec3& position)
 	{
 		m_Position = position;
@@ -157,7 +164,7 @@ namespace Omnia
 
 	void FPSCamera::RecalculateProjectionMatrix()
 	{
-		m_ProjectionMatrix = glm::perspective(m_Fov, m_Aspect, m_zNear, m_zFar);
+		m_ProjectionMatrix = glm::perspective(glm::radians(m_Fov), m_Aspect, m_zNear, m_zFar);
 
 		m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix;
 	}
