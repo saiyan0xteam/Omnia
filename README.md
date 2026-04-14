@@ -7,8 +7,8 @@
 
 ## ⌨️ Keybinds
 
-Camera Zoom = Left Control + Mouse Wheel
-Toggle Fullscreen = F11
+Camera Zoom = Left Control + Mouse Wheel<br>
+Toggle Fullscreen = F11<br>
 Toggle DevInfo = F10
 
 ## ⚖️ License
@@ -21,10 +21,10 @@ For more details, please see the [LICENSE](LICENSE) file.
 
 ## ⛓️‍💥 Social Media and Links
 
-[Discord Server](https://discord.gg/DtUtSgdqNu)
+[Discord Server](https://discord.gg/n3TvbzpQem)
 
 ## 👏 Special Thanks
 
-[Raysan5 - Raylib](https://github.com/raysan5/raylib)
-[Discord and dhanax26 - Rich Presence](https://github.com/dhanax26/C---Discord-RPC)
+[Raysan5 - Raylib](https://github.com/raysan5/raylib)<br>
+[Discord and dhanax26 - Rich Presence](https://github.com/dhanax26/C---Discord-RPC)<br>
 [imagine.art - AI Game Musics](https://www.imagine.art/)
