@@ -39,29 +39,21 @@ public:
 	}
 
 	void Fire(float dt) {
-		isMoving = false;
-
-		if (IsKeyDown(KEY_D)) {
-			pos.x += speed * dt;
-			dir = RIGHT;
-			isMoving = true;
+		Vector2 move = { 0, 0 };
+		if (IsKeyDown(KEY_D)) move.x += 1;
+		if (IsKeyDown(KEY_A)) move.x -= 1;
+		if (IsKeyDown(KEY_W)) move.y -= 1;
+		if (IsKeyDown(KEY_S)) move.y += 1;
+		isMoving = (move.x != 0 || move.y != 0);
+		if (IsKeyDown(KEY_D)) dir = RIGHT;
+		if (IsKeyDown(KEY_A)) dir = LEFT;
+		if (IsKeyDown(KEY_W)) dir = UP;
+		if (IsKeyDown(KEY_S)) dir = DOWN;
+		if (isMoving) {
+			move = Vector2Normalize(move);
+			pos.x += move.x * speed * dt;
+			pos.y += move.y * speed * dt;
 		}
-		else if (IsKeyDown(KEY_A)) {
-			pos.x -= speed * dt;
-			dir = LEFT;
-			isMoving = true;
-		}
-		else if (IsKeyDown(KEY_W)) {
-			pos.y -= speed * dt;
-			dir = UP;
-			isMoving = true;
-		}
-		else if (IsKeyDown(KEY_S)) {
-			pos.y += speed * dt;
-			dir = DOWN;
-			isMoving = true;
-		}
-
 		if (isMoving) {
 			switch (dir) {
 			case DOWN:  currentAnim = &walk_down; break;
@@ -78,9 +70,11 @@ public:
 			case RIGHT: currentAnim = &idle_right; break;
 			}
 		}
-
 		currentAnim->AnimSwap(dt);
-		DrawTexture(currentAnim->GetTexture(), pos.x, pos.y, WHITE);
+	}
+
+	void Paint() {
+		DrawTexture(currentAnim->GetTexture(), (int)pos.x, (int)pos.y, WHITE);
 	}
 
 	void Destroy() {

@@ -96,18 +96,78 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Library\Discord\Discord.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\connection_win.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\discord_register_win.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\discord_rpc.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\dllmain.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\rpc_connection.cpp" />
+    <ClCompile Include="Library\Discord\DiscordSDK\src\serialization.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Interface\ICamera.h" />
+    <ClInclude Include="Interface\IFPSCounter.h" />
     <ClInclude Include="Interface\IPlayer.h" />
     <ClInclude Include="Interface\ITexture.h" />
+    <ClInclude Include="Interface\IWorld.h" />
+    <ClInclude Include="Library\Discord\Discord.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\include\discord_register.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\include\discord_rpc.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\backoff.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\connection.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\msg_queue.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\allocators.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\cursorstreamwrapper.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\document.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\encodedstream.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\encodings.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\error\en.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\error\error.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\filereadstream.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\filewritestream.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\fwd.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\biginteger.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\diyfp.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\dtoa.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\ieee754.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\itoa.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\meta.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\pow10.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\regex.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\stack.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\strfunc.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\strtod.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\internal\swap.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\istreamwrapper.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\memorybuffer.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\memorystream.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\msinttypes\inttypes.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\msinttypes\stdint.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\ostreamwrapper.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\pointer.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\prettywriter.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\rapidjson.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\reader.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\schema.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\stream.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\stringbuffer.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rapidjson\writer.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\rpc_connection.h" />
+    <ClInclude Include="Library\Discord\DiscordSDK\src\serialization.h" />
     <ClInclude Include="Library\EasyCPP\EzXor.h" />
     <ClInclude Include="Library\EasyCPP\Logger.h" />
     <ClInclude Include="Library\RayLib\include\raylib.h" />
     <ClInclude Include="Library\RayLib\include\raymath.h" />
     <ClInclude Include="Library\RayLib\include\rlgl.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="shared.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Omnia.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="C:\Users\Saiyan\Downloads\OmniaLogo.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
