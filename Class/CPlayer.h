@@ -63,6 +63,7 @@ public:
         (WorkingDirectory + "\\textures\\character\\adelina_walk_right2.png")
             .c_str());
     pos = {0, 0};
+    currentAnim = &idle_down;
   }
 
   void Fire(float dt) {
@@ -86,6 +87,7 @@ public:
       dir = DOWN;
     if (isMoving) {
       move = Vector2Normalize(move);
+      if (invertY) move.y *= -1.0f; // Y eksenini tersle ayarı
       pos.x += move.x * speed * dt;
       pos.y += move.y * speed * dt;
     }

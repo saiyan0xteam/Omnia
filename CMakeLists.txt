@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES
     main.cpp
     Library/EasyCPP/Logger.cpp
+    Class/CModLoader.cpp
     Library/Discord/Discord.cpp
     Library/Discord/DiscordSDK/src/discord_rpc.cpp
     Library/Discord/DiscordSDK/src/rpc_connection.cpp
@@ -37,14 +38,26 @@ set(HEADERS
     Library/EasyCPP/Logger.h
 )
 
+# Python & Lua Support
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# Lua Source Files (excluding lua.c and luac.c which are for standalone executables)
+file(GLOB LUA_SOURCES "Library/Lua/src/*.c")
+list(REMOVE_ITEM LUA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/Library/Lua/src/lua.c" "${CMAKE_CURRENT_SOURCE_DIR}/Library/Lua/src/luac.c")
+add_library(lua_lib STATIC ${LUA_SOURCES})
+
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Library
-    ${CMAKE_CURRENT_SOURCE_DIR}/Interface
+    ${CMAKE_CURRENT_SOURCE_DIR}/Class
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/RayLib/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/Discord/DiscordSDK/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/Discord/DiscordSDK/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/Library/pybind11/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Library/Lua/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/Library/sol2
+    ${Python3_INCLUDE_DIRS}
 )
 
 # Library directories (Local Raylib)
@@ -60,16 +73,19 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME}
         PRIVATE
         raylib
+        lua_lib
+        Python3::Python
         opengl32
         gdi32
         winmm
         shell32
     )
 else()
-    # Linux için gerekli bağlantılar (Paket yöneticisinden kurulu olduğu varsayılır veya Library içine eklenir)
     target_link_libraries(${PROJECT_NAME}
         PRIVATE
         raylib
+        lua_lib
+        Python3::Python
         GL
         m
         pthread

@@ -1,106 +1,186 @@
 #pragma once
 #include "../shared.h"
-#include "CPlayer.h"
-#include "CCamera.h"
 #include "CFPSCounter.h"
-#include "CWorld.h"
+#include "CMenu.h"
+#include "CModLoader.h"
+#include <JSON/json.hpp>
+#include <filesystem>
+#include <fstream>
+#include <raylib.h>
+#include <string>
+
+using json = nlohmann::json;
 
 class CGame {
 public:
-    CPlayer Adelina;
-    CCamera Camera;
-    CWorld World;
-    CFPSCounter FPSDebug;
-    Discord drpc;
-    Music leaffall;
-    Image windowLogo;
+  enum GameState { MENU, INGAME };
+  GameState gameState = MENU;
 
-    void Init() {
-        windowLogo = LoadImage("Omnia.png");
-        WorkingDirectory = std::filesystem::current_path().string();
+  CModLoader ModLoader;
+  CFPSCounter FPSDebug;
+  CMenu Menu;
 
-        InitWindow(1280, 720, ("Omnia " + OmniaVersion).c_str());
-        SetWindowIcon(windowLogo);
-        SetTargetFPS(60);
-        SetExitKey(KEY_NULL);
+  Image windowLogo;
+  Music leaffall;
 
-        InitAudioDevice();
+  void LoadSettings() {
+    std::string path = WorkingDirectory + "/settings.json";
+    if (std::filesystem::exists(path)) {
+      try {
+        std::ifstream f(path);
+        json data = json::parse(f);
 
-        leaffall = LoadMusicStream((WorkingDirectory + "\\music\\leaffall.mp3").c_str());
-        PlayMusicStream(leaffall);
-        SetMusicVolume(leaffall, 0.85f);
+        isFullscreen = data.value("isFullscreen", false);
+        vsync = data.value("vsync", true);
+        sW = data.value("sW", 1280);
+        sH = data.value("sH", 720);
+        musicVolume = data.value("musicVolume", 0.85f);
+        isMusicMuted = data.value("isMusicMuted", false);
+        mouseSensitivity = data.value("mouseSensitivity", 1.0f);
+        invertY = data.value("invertY", false);
 
-        drpc.Initialize("1493574877779853382");
-        drpc.Update();
+        Logger::Success("Settings", "Settings loaded from settings.json");
+      } catch (std::exception &e) {
+        Logger::Error("Settings", "Failed to parse settings.json: " + std::string(e.what()));
+      }
+    } else {
+      SaveSettings();
+    }
+  }
 
-        Adelina.Power();
-        Camera.Power();
+  void SaveSettings() {
+    std::string path = WorkingDirectory + "/settings.json";
+    json data;
+    data["isFullscreen"] = isFullscreen;
+    data["vsync"] = vsync;
+    data["sW"] = sW;
+    data["sH"] = sH;
+    data["musicVolume"] = musicVolume;
+    data["isMusicMuted"] = isMusicMuted;
+    data["mouseSensitivity"] = mouseSensitivity;
+    data["invertY"] = invertY;
+
+    std::ofstream f(path);
+    f << data.dump(4);
+    Logger::Success("Settings", "Settings saved to settings.json");
+  }
+
+  void Init() {
+    windowLogo = LoadImage("Omnia.png");
+    WorkingDirectory = std::filesystem::current_path().string();
+
+    LoadSettings();
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(sW, sH, ("Omnia " + OmniaVersion).c_str());
+    SetWindowIcon(windowLogo);
+
+    if (isFullscreen) {
+      int m = GetCurrentMonitor();
+      sW = GetMonitorWidth(m); // Açılışta sW/sH'ı güncelle
+      sH = GetMonitorHeight(m);
+      SetWindowSize(sW, sH);
+      ToggleFullscreen();
     }
 
-    void Run() {
-        while (!WindowShouldClose()) {
-            Update();
-            Draw();
-        }
+    SetTargetFPS(vsync ? 60 : 0);
+    SetExitKey(KEY_NULL);
+
+    InitAudioDevice();
+    leaffall = LoadMusicStream("Assets/Music/leaffall.mp3");
+    PlayMusicStream(leaffall);
+
+    ModLoader.Init();
+    Menu.Power();
+  }
+
+  void Update() {
+    float realDeltaTime = GetFrameTime();
+
+    FPSDebug.Update();
+    UpdateMusicStream(leaffall);
+    SetMusicVolume(leaffall, isMusicMuted ? 0.0f : musicVolume);
+
+    if (IsKeyPressed(KEY_F11)) {
+      isFullscreen = !isFullscreen;
+      isResDirty = true;
     }
 
-    void Update() {
-        sW = GetScreenWidth();
-        sH = GetScreenHeight();
+    if (isResDirty || (IsWindowFullscreen() != isFullscreen)) {
+      int monitor = GetCurrentMonitor();
+      int mW = GetMonitorWidth(monitor);
+      int mH = GetMonitorHeight(monitor);
 
-        if (IsKeyPressed(KEY_F11)) {
-            isFullscreen = !isFullscreen;
-            if (isFullscreen) {
-                int monitor = GetCurrentMonitor();
-                int w = GetMonitorWidth(monitor);
-                int h = GetMonitorHeight(monitor);
-                SetWindowSize(w, h);
-                ToggleFullscreen();
-            } else {
-                ToggleFullscreen();
-                SetWindowSize(1280, 720);
-            }
-        }
+      if (isFullscreen) {
+        if (!IsWindowFullscreen())
+          ToggleFullscreen();
+        sW = mW; // sW ve sH'ı monitör boyutuna eşitle
+        sH = mH;
+        SetWindowSize(sW, sH);
+      } else {
+        if (IsWindowFullscreen())
+          ToggleFullscreen();
+        SetWindowSize(sW, sH);
+        SetWindowPosition((mW - sW) / 2, (mH - sH) / 2);
+      }
 
-        float deltaTime = GetFrameTime();
-        FPSDebug.Update();
-        UpdateMusicStream(leaffall);
-
-        Adelina.Fire(deltaTime);
-        Camera.Fire(deltaTime, Adelina.pos);
-        World.Fire(Adelina.pos);
-        World.CleanOldVolumes();
-        
-        if (IsKeyPressed(KEY_F10)) isDebug = !isDebug;
+      isResDirty = false;
+      isFullscreen = IsWindowFullscreen();
+      SaveSettings();
     }
 
-    void Draw() {
-        BeginDrawing();
-        ClearBackground(BLACK);
+    if (vsync)
+      SetTargetFPS(60);
+    else
+      SetTargetFPS(0);
 
-        Camera.Enter();
-        World.Paint();
-        Adelina.Paint();
+    if (gameState == MENU) {
+      Menu.Fire(realDeltaTime);
+      if (Menu.shouldGoToTitle) {
+        gameState = MENU;
+        Menu.shouldGoToTitle = false;
+        Menu.isVisible = true;
+        Menu.currentState = CMenu::MAIN;
+      }
+      if (!Menu.isVisible && Menu.alpha <= 0.0f) {
+        gameState = INGAME;
+      }
+    } else {
+      if (IsKeyPressed(KEY_ESCAPE)) {
+        gameState = MENU;
+        Menu.isVisible = true;
+      }
+    }
+  }
 
-        DrawText("Hello raylib!", 300, 280, 20, RAYWHITE);
-        DrawRectangle(300, 300, 50, 50, RED);
-        Camera.Destroy();
+  void Draw() {
+    BeginDrawing();
+    ClearBackground(BLACK);
 
-        if (isDebug) {
-            DrawText(TextFormat("FPS: %d\nFrameTime: %.2f ms\n%%1: %.2f ms\n%%0.1: %.2f ms", 
-                (int)FPSDebug.GetFPS(), FPSDebug.GetAverage(), FPSDebug.GetP1(), FPSDebug.GetP01()), 10, 10, 16, WHITE);
-            DrawText(TextFormat("LocalPlayer X: %.2f Y: %.2f", Adelina.pos.x, Adelina.pos.y), 10, 100, 16, WHITE);
-        }
-
-        EndDrawing();
+    if (gameState == INGAME) {
+      DrawText("GAME IS RUNNING...", 100, 100, 20, RAYWHITE);
     }
 
-    void Shutdown() {
-        Adelina.Destroy();
-        Logger::Shutdown();
-        UnloadMusicStream(leaffall);
-        CloseAudioDevice();
-        UnloadImage(windowLogo);
-        CloseWindow();
+    if (gameState == MENU) {
+      Menu.PaintMenu(gameState == INGAME);
     }
+
+    EndDrawing();
+  }
+
+  void Run() {
+    while (!WindowShouldClose()) {
+      Update();
+      Draw();
+    }
+    Shutdown();
+  }
+
+  void Shutdown() {
+    SaveSettings();
+    UnloadMusicStream(leaffall);
+    CloseAudioDevice();
+    Menu.Destroy();
+    CloseWindow();
+  }
 };

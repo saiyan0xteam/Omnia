@@ -1,0 +1,10 @@
+#ifndef SOL_CONFIG_HPP
+#define SOL_CONFIG_HPP
+
+// Omnia sol2 Configuration
+#define SOL_ALL_SAFETIES_ON 1
+#define SOL_USE_STD_OPTIONAL 1
+#define SOL_USE_STD_VARIANT 1
+#define SOL_NO_CHECK_NUMBER_PRECISION 1
+
+#endif // SOL_CONFIG_HPP
