@@ -3,13 +3,14 @@
 
 ## 🖼️ Screenshot
 
-<img width="1280" height="753" alt="image" src="https://github.com/user-attachments/assets/5a9bd2a4-4b2a-41eb-bd91-a3993973fb78" />
+<img width="1281" height="754" alt="image" src="https://github.com/user-attachments/assets/5c75838c-d319-4a23-af3f-4664d7099942" />
 
 ## ⌨️ Keybinds
 
 Camera Zoom = Left Control + Mouse Wheel<br>
 Toggle Fullscreen = F11<br>
-Toggle DevInfo = F10
+Toggle DevInfo = F10<br>
+Pause Menu = ESC
 
 ## 👩‍💻 Building From Source
 
@@ -22,6 +23,11 @@ If you think you haven’t done anything wrong, feel free to [create a issue](ht
 
 ### Linux
 I haven't tested the Linux build yet; I'll test it later and update this section.
+
+## ⚙ Modding
+For Now, most Python and Lua functions are only essential system functions (console logger, raylib functions, etc.)<br>
+I'll Expand on this in Future Updates.<br>
+https://saiyanzerox.gitbook.io/omnia-documentation
 
 ## ⚖️ License
 
@@ -41,4 +47,8 @@ For more details, please see the [LICENSE](LICENSE) file.
 [Discord and dhanax26 - Rich Presence](https://github.com/dhanax26/C---Discord-RPC)<br>
 [imagine.art - AI Game Musics](https://www.imagine.art/)<br>
 [CMake](https://cmake.org/)<br>
-[LLVM - LLVM Project](https://github.com/llvm/llvm-project)
+[LLVM - LLVM Project](https://github.com/llvm/llvm-project)<br>
+[Lua - Lua](https://github.com/lua/lua)<br>
+[ThePhd - Sol2](https://github.com/ThePhd/sol2)<br>
+[PyBind - PyBind11](https://github.com/pybind/pybind11)<br>
+[Nlohmann - JSON](https://github.com/nlohmann/json)
