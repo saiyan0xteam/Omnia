@@ -1,9 +1,9 @@
 #pragma once
 #include "../shared.h"
 
-class ICamera {
+class CCamera {
 public:
-	Camera2D camera = { 0 };
+	Camera2D camera = { };
 	float targetZoom = 1.0f;
 	
 	void Power() {

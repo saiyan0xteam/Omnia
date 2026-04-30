@@ -1,7 +1,6 @@
 #pragma once
-#include "DiscordSDK/include/discord_register.h"
-#include "DiscordSDK/include/discord_rpc.h"
-#include <Windows.h>
+#include <discord_rpc.h>
+#include <discord_register.h>
 
 class Discord {
 public:

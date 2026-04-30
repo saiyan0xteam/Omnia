@@ -1,10 +1,10 @@
 #pragma once
 #include "../shared.h"
 
-class IFPSCounter {
+class CFPSCounter {
 public:
     std::vector<float> frameTimes;
-    const int maxSamples = 300;
+    const size_t maxSamples = 300;
 
     void Update() {
         float dt = GetFrameTime() * 1000.0f;

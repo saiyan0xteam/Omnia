@@ -1,7 +1,7 @@
 #pragma once
 #include "../shared.h"
 
-class IWorld {
+class CWorld {
 public:
     static constexpr int VOLUME_SIZE = 32;
     static constexpr int TILE_SIZE = 16;

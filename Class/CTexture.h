@@ -1,7 +1,7 @@
 #pragma once
 #include "../shared.h"
 
-class ITexture {
+class CTexture {
 public:
 	Texture2D tex[2];
 	int frame = 0;
