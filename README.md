@@ -3,13 +3,25 @@
 
 ## 🖼️ Screenshot
 
-<img width="1282" height="752" alt="{BE0FD88F-BE15-4479-A1B8-A4DC0F38B253}" src="https://github.com/user-attachments/assets/2f537e88-5e7c-48bf-9b81-ff77d7b32a95" />
+<img width="1280" height="753" alt="image" src="https://github.com/user-attachments/assets/5a9bd2a4-4b2a-41eb-bd91-a3993973fb78" />
 
 ## ⌨️ Keybinds
 
 Camera Zoom = Left Control + Mouse Wheel<br>
 Toggle Fullscreen = F11<br>
 Toggle DevInfo = F10
+
+## 👩‍💻 Building From Source
+
+### Windows
+Download and Install CMake from https://cmake.org/download/ (Don't Forget Check the Add to Path Checkbox)<br>
+Download and Install CLang from https://github.com/llvm/llvm-project/releases (Don't Forget Check the Add to Path Checkbox)<br>
+Double Click to build.bat<br>
+You've compiled the source code; if the "build" folder didn't appear, you did something wrong.<br>
+If you think you haven’t done anything wrong, feel free to [create a issue](https://github.com/saiyan0xteam/Omnia/issues)
+
+### Linux
+I haven't tested the Linux build yet; I'll test it later and update this section.
 
 ## ⚖️ License
 
@@ -19,7 +31,7 @@ This project is released under the **Dash Source-Available License (DSAL)**.
 - **Redistribution:** Strictly prohibited. 
 For more details, please see the [LICENSE](LICENSE) file.
 
-## ⛓️‍💥 Social Media and Links
+## ⛓ Social Media and Links
 
 [Discord Server](https://discord.gg/n3TvbzpQem)
 
@@ -27,4 +39,6 @@ For more details, please see the [LICENSE](LICENSE) file.
 
 [Raysan5 - Raylib](https://github.com/raysan5/raylib)<br>
 [Discord and dhanax26 - Rich Presence](https://github.com/dhanax26/C---Discord-RPC)<br>
-[imagine.art - AI Game Musics](https://www.imagine.art/)
+[imagine.art - AI Game Musics](https://www.imagine.art/)<br>
+[CMake](https://cmake.org/)<br>
+[LLVM - LLVM Project](https://github.com/llvm/llvm-project)
