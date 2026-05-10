@@ -3,13 +3,13 @@
 
 ## 🖼️ Screenshot
 
-<img width="1281" height="754" alt="image" src="https://github.com/user-attachments/assets/5c75838c-d319-4a23-af3f-4664d7099942" />
+<img width="1279" height="749" alt="image" src="https://github.com/user-attachments/assets/807a1526-1998-4cef-bce6-5133451a7f23" />
 
 ## ⌨️ Keybinds
 
 Camera Zoom = Left Control + Mouse Wheel<br>
 Toggle Fullscreen = F11<br>
-Toggle DevInfo = F10<br>
+Toggle Debug = F10<br>
 Pause Menu = ESC
 
 ## 👩‍💻 Building From Source
@@ -25,8 +25,7 @@ If you think you haven’t done anything wrong, feel free to [create a issue](ht
 I haven't tested the Linux build yet; I'll test it later and update this section.
 
 ## ⚙ Modding
-For Now, most Python and Lua functions are only essential system functions (console logger, raylib functions, etc.)<br>
-I'll Expand on this in Future Updates.<br>
+You can find all the information you need about modding in the GitBook below<br>
 https://saiyanzerox.gitbook.io/omnia-documentation
 
 ## ⚖️ License
@@ -51,4 +50,5 @@ For more details, please see the [LICENSE](LICENSE) file.
 [Lua - Lua](https://github.com/lua/lua)<br>
 [ThePhd - Sol2](https://github.com/ThePhd/sol2)<br>
 [PyBind - PyBind11](https://github.com/pybind/pybind11)<br>
-[Nlohmann - JSON](https://github.com/nlohmann/json)
+[Nlohmann - JSON](https://github.com/nlohmann/json)<br>
+[richgel999 - miniz](https://github.com/richgel999/miniz)
