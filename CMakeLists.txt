@@ -13,6 +13,7 @@ set(SOURCES
     Library/Discord/DiscordSDK/src/discord_rpc.cpp
     Library/Discord/DiscordSDK/src/rpc_connection.cpp
     Library/Discord/DiscordSDK/src/serialization.cpp
+    Library/miniz/miniz.c
 )
 
 if(WIN32)
@@ -57,6 +58,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/pybind11/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/Lua/src
     ${CMAKE_CURRENT_SOURCE_DIR}/Library/sol2
+    ${CMAKE_CURRENT_SOURCE_DIR}/Library/miniz
     ${Python3_INCLUDE_DIRS}
 )
 

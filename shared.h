@@ -18,7 +18,7 @@ inline bool isMusicMuted = false;
 inline int sW = 1280;
 inline int sH = 720;
 inline std::string WorkingDirectory;
-inline std::string OmniaVersion = "V0.4";
+inline std::string OmniaVersion = "V0.5";
 inline float musicVolume = 0.85f;
 inline float mouseSensitivity = 1.0f;
 inline bool vsync = true;
